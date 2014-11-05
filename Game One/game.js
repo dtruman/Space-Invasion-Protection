@@ -14,6 +14,15 @@ var KEYCODE_D=68;
 var KEYCODE_SPACE=32;
 var KEYCODE_J=74;
 
+var LeftOn;
+var UpOn;
+var RightOn;
+var WOn;
+var AOn;
+var SOn;
+var DOn;
+var JOn;
+
 //Mouse Locations
 var mouseX, mouseY;
 
@@ -39,6 +48,8 @@ var mxText, myText;
 
 //Sprite sheets
 var buttonSheet;
+var SpaceManSheet;
+var walkSheet;
 
 //Buttons
 var btnPlay;
@@ -47,8 +58,7 @@ var btnMenu;
 var btnContinue;
 
 //Player Sheets
-var walkSheet;
-var walk;
+var SpaceMan;
 
 //Miscellaneous
 var textTime;
@@ -70,6 +80,8 @@ var movePlayerLeft;
 var movePlayerRight;
 var movePlayerUP;
 var movePlayerDOWN;
+var soundOn;
+var soundOff;
 
 var shooter;
 var shooterDir;
@@ -93,6 +105,8 @@ var doorTwoHPBar;
 
 var doorHitSound;
 var gameOverSound;
+var music;
+var mute;
 
 //Physics stuff
 var gravity;
@@ -107,44 +121,55 @@ function setupCanvas()
     stage.enableMouseOver();
     loadFiles();
     gameState=LOADING;
-
+    
+    //Control Setup
+    LeftOn=false;
+    UpOn=false;
+    RightOn=false;
+    WOn=false;
+    AOn=false;
+    SOn=false;
+    DOn=false;
+    JOn=false;
+    
     stage.update();
 }
 
 function setupFiles()
 {
-    mxText=new createjs.Text("Placeholder", "12px Arial", "#ffffff");
-    myText=new createjs.Text("Placeholder", "12px Arial", "#ffffff");
     textTime=new createjs.Text("Placeholder", "12px Arial", "#ffffff");
     textScore=new createjs.Text("Placeholder", "12px Arial", "#ffffff");
     inputTextCases=new createjs.Text("Placeholder", "12px Arial", "#ffffff");
-        
-    mxText.x=10;
-    mxText.y=50;
-    myText.x=10;
-    myText.y=100;
-    textTime.x=10;
-    textTime.y=200;
-    textScore.x=10;
-    textScore.y=250;
-    inputTextCases.x=10;
-    inputTextCases.y=300;
+
+    alreadyWalking=false;
+    textTime.x=250;
+    textTime.y=20;
+    textTime.scaleX=3;
+    textTime.scaleY=3;
+    textScore.x=450;
+    textScore.y=20;
+    textScore.scaleX=3;
+    textScore.scaleY=3;
     spawnSpeed=120;
     spawnerCount=120;
     
-    stage.addChild(titleScreen, backgroundScreen, instructionScreen, gameoverScreen, mxText, myText, textTime, textScore);
+    stage.addChild(titleScreen, backgroundScreen, instructionScreen, gameoverScreen, textTime, textScore);
     
     btnPlay=new createjs.Sprite(buttonSheet, "playUp");
     btnPlay.x=200;
-    btnPlay.y=500;
+    btnPlay.y=400;
+    btnPlay.scaleX=1.3;
+    btnPlay.scaleY=1.3;
     btnPlay.on("click", function(evt){gameState=PLAY_GAME; btnPlay.gotoAndPlay("playDown");});
     btnPlay.on("mouseover", function(evt){btnPlay.gotoAndPlay("playOver");});
     btnPlay.on("mouseout", function(evt){btnPlay.gotoAndPlay("playUp");});
     stage.addChild(btnPlay);
     
     btnInstruct=new createjs.Sprite(buttonSheet, "instructUp");
-    btnInstruct.x=300;
-    btnInstruct.y=500;
+    btnInstruct.x=192;
+    btnInstruct.y=460;
+    btnInstruct.scaleX=1.3;
+    btnInstruct.scaleY=1.3;
     btnInstruct.on("click", function(evt){gameState=LEARN_GAME; btnInstruct.gotoAndPlay("instructDown");});
     btnInstruct.on("mouseover", function(evt){btnInstruct.gotoAndPlay("instructOver");});
     btnInstruct.on("mouseout", function(evt){btnInstruct.gotoAndPlay("instructUp");});
@@ -153,25 +178,29 @@ function setupFiles()
     btnMenu=new createjs.Sprite(buttonSheet, "menuUp");
     btnMenu.x=400;
     btnMenu.y=500;
+    btnMenu.scaleX=1.3;
+    btnMenu.scaleY=1.3;
     btnMenu.on("click", function(evt){gameState=TITLE_SCREEN; btnMenu.gotoAndPlay("menuDown");});
     btnMenu.on("mouseover", function(evt){btnMenu.gotoAndPlay("menuOver");});
     btnMenu.on("mouseout", function(evt){btnMenu.gotoAndPlay("menuUp");});
     stage.addChild(btnMenu);
     
     btnContinue=new createjs.Sprite(buttonSheet, "continueUp");
-    btnContinue.x=500;
-    btnContinue.y=500;
+    btnContinue.x=400;
+    btnContinue.y=550;
+    btnContinue.scaleX=1.3;
+    btnContinue.scaleY=1.3;
     btnContinue.on("click", function(evt){gameState=PLAY_GAME; btnContinue.gotoAndPlay("continueDown");});
     btnContinue.on("mouseover", function(evt){btnContinue.gotoAndPlay("continueOver");});
     btnContinue.on("mouseout", function(evt){btnContinue.gotoAndPlay("continueUp");});
     stage.addChild(btnContinue);
     
-    levelNumber=new createjs.Text("1", "28px Arial", "#000000");
+    levelNumber=new createjs.Bitmap(queue.getResult("Badge"));
     levelNumber.x=100;
     levelNumber.y=100;
     
     levelSign=new createjs.Container();
-    levelSign.addChild(levelFrame, levelNumber);
+    levelSign.addChild(levelNumber);
     
     platforms=new Array();
     platHeights=new Array();
@@ -186,87 +215,141 @@ function setupFiles()
     enemyDir=new Array();
     enemyCount=0;
     
-    platforms.push(new createjs.Shape());
-    platforms[0].graphics.beginFill("A66").drawRect(0,0,300,20);
-    platforms[0].x=800/2-150;
+    var scale=0.6;
+    var scale2=1.5;
+    
+    platforms.push(new createjs.Bitmap(queue.getResult("platform")));
+    platforms[0].x=800/2-180;
     platforms[0].y=600/2-10;
+    platforms[0].scaleY=scale;
+    platforms[0].scaleX=scale2+0.3;
     platHeights.push(20);
     platWidths.push(300);
     
-    platforms.push(new createjs.Shape());
-    platforms[1].graphics.beginFill("A66").drawRect(0,0,800,20);
+    platforms.push(new createjs.Bitmap(queue.getResult("platform")));
     platforms[1].y=580;
+    platforms[1].x-=30;
+    platforms[1].scaleY=scale;
+    platforms[1].scaleX=scale2;
+    platHeights.push(20);
+    platWidths.push(830);
+    
+    platforms.push(new createjs.Bitmap(queue.getResult("platform")));
+    platforms[2].y=150;
+    platforms[2].x-=30;
+    platforms[2].scaleY=scale;
+    platforms[2].scaleX=scale2;
+    platHeights.push(20);
+    platWidths.push(250);
+    
+    platforms.push(new createjs.Bitmap(queue.getResult("platform")));
+    platforms[3].y=150;
+    platforms[3].x=800/2+120;
+    platforms[3].scaleY=scale;
+    platforms[3].scaleX=scale2+0.2;
+    platHeights.push(20);
+    platWidths.push(280);
+    
+    platforms.push(new createjs.Bitmap(queue.getResult("platform")));
+    platforms[4].y=450;
+    platforms[4].x-=30;
+    platforms[4].scaleY=scale;
+    platforms[4].scaleX=scale2;
+    platHeights.push(20);
+    platWidths.push(250);
+    
+    platforms.push(new createjs.Bitmap(queue.getResult("platform")));
+    platforms[5].y=450;
+    platforms[5].x=800/2+120;
+    platforms[5].scaleY=scale;
+    platforms[5].scaleX=scale2+0.2;
+    platHeights.push(20);
+    platWidths.push(280);
+    
+    platforms.push(new createjs.Bitmap(queue.getResult("platform")));
+    platforms[6].y=580;
+    platforms[6].x+=200;
+    platforms[6].scaleY=scale;
+    platforms[6].scaleX=scale2;
     platHeights.push(20);
     platWidths.push(800);
     
-    platforms.push(new createjs.Shape());
-    platforms[2].graphics.beginFill("A66").drawRect(0,0,250,20);
-    platforms[2].y=150;
+    platforms.push(new createjs.Bitmap(queue.getResult("platform")));
+    platforms[7].y=580;
+    platforms[7].x+=400;
+    platforms[7].scaleY=scale;
+    platforms[7].scaleX=scale2;
     platHeights.push(20);
-    platWidths.push(250);
+    platWidths.push(830);
     
-    platforms.push(new createjs.Shape());
-    platforms[3].graphics.beginFill("A66").drawRect(0,0,250,20);
-    platforms[3].y=150;
-    platforms[3].x=800/2+150;
+    platforms.push(new createjs.Bitmap(queue.getResult("platform")));
+    platforms[8].y=580;
+    platforms[8].x+=600;
+    platforms[8].scaleY=scale;
+    platforms[8].scaleX=scale2;
     platHeights.push(20);
-    platWidths.push(250);
+    platWidths.push(800);
     
-    platforms.push(new createjs.Shape());
-    platforms[4].graphics.beginFill("A66").drawRect(0,0,250,20);
-    platforms[4].y=450;
-    platHeights.push(20);
-    platWidths.push(250);
-    
-    platforms.push(new createjs.Shape());
-    platforms[5].graphics.beginFill("A66").drawRect(0,0,250,20);
-    platforms[5].y=450;
-    platforms[5].x=800/2+150;
-    platHeights.push(20);
-    platWidths.push(250);
-    
-    door=new createjs.Shape();
-    door.graphics.beginFill(["F00", "#00F"]).drawRect(0,0,50,50);
+    door=new createjs.Bitmap(queue.getResult("door"));
     door.y=530;
+    door.scaleX=1.6;
     door.x=400-25;
     doorHeight=50;
     doorWidth=50;
     
     doorHP=10;
     
-    doorHPBar=new createjs.Shape();
-    doorHPBar.graphics.beginFill("FF0000").drawRect(0,0,50,10);
+    doorHPBar=new createjs.Bitmap(queue.getResult("HP"));
     doorHPBar.y=510;
     doorHPBar.x=375;
+    doorHPBar.scaleY=0.2;
     
-    doorTwo=new createjs.Shape();
-    doorTwo.graphics.beginFill(["F00", "#00F"]).drawRect(0,0,50,50);
+    doorTwo=new createjs.Bitmap(queue.getResult("door"));
     doorTwo.y=240;
     doorTwo.x=400-25;
+    doorTwo.scaleX=1.6;
     
     doorTwoHP=10;
     
-    doorTwoHPBar=new createjs.Shape();
-    doorTwoHPBar.graphics.beginFill("FF0000").drawRect(0,0, 50, 10);
+    doorTwoHPBar=new createjs.Bitmap(queue.getResult("HP"));
     doorTwoHPBar.y=220;
     doorTwoHPBar.x=375;
+    doorTwoHPBar.scaleY=0.2;
     
-    player=new createjs.Shape();
-    player.graphics.beginFill("F00").drawRect(0,0,30,40);
+    player=new createjs.Sprite(SpaceManSheet, "stand");
     player.y=530;
+    player.regY=10;
     playerWidth=30;
     playerHeight=40;
     
     playerForce=0;
     
-    stage.addChild(door, doorHPBar, doorTwo, doorTwoHPBar,player);
-    for(i=0; i<6; i++)
+    SoundOff=new createjs.Bitmap(queue.getResult("SoundOFF"));
+    SoundOff.y=550;
+    SoundOff.x=740;
+    SoundOff.scaleY=0.3;
+    SoundOff.scaleX=0.3;
+    SoundOff.on("click", function(evt){mute=false; SoundOff.visible=false; SoundOn.visible=true;});
+    
+    SoundOn=new createjs.Bitmap(queue.getResult("SoundON"));
+    SoundOn.y=550;
+    SoundOn.x=740;
+    SoundOn.scaleY=0.3;
+    SoundOn.scaleX=0.3;
+    SoundOn.on("click", function(evt){mute=true; SoundOff.visible=true; SoundOn.visible=false;});
+    
+    stage.addChild(door, doorHPBar, doorTwo, doorTwoHPBar,player, SoundOff, SoundOn);
+    for(i=0; i<platforms.length; i++)
     {
         stage.addChild(platforms[i]);
     }
-    stage.addChild(inputTextCases, levelSign);
+    stage.addChild(levelSign, SoundOff, SoundOn);
+    SoundOff.visible=false;
+    SoundOn.visible=true;
     
     gameState=TITLE_SCREEN;
+    music=createjs.Sound.play("./Assets/VastSpace.ogg", {loop:-1});
+    
     stage.update();
 }
 
@@ -275,6 +358,7 @@ function main()
     setupCanvas();
 }
 
+var alreadyPlaying;
 function loop()
 {   
     stage.update();
@@ -284,7 +368,7 @@ function loop()
         case LOADING:
             break;
         case PLAY_GAME:
-            levelSign.x=350;
+            levelSign.x=160;
             levelSign.y=-1000;
 			levelSign.visible=true;
             titleScreen.visible=false;
@@ -296,6 +380,7 @@ function loop()
             btnMenu.visible=false;
             btnContinue.visible=false;
             textScore.visible=true;
+            textTime.visible=true;
             door.visible=true;
             doorHPBar.visible=true;
             doorTwo.visible=true;
@@ -307,6 +392,9 @@ function loop()
             platforms[3].visible=true;
             platforms[4].visible=true;
             platforms[5].visible=true;
+            platforms[6].visible=true;
+            platforms[7].visible=true;
+            platforms[8].visible=true;
             resetGameTimer();
             score=0;
             tweenObj();
@@ -323,6 +411,7 @@ function loop()
             btnMenu.visible=false;
             btnContinue.visible=false;
             textScore.visible=false;
+            textTime.visible=false;
             door.visible=false;
             player.visible=false;
             doorHPBar.visible=false;
@@ -336,6 +425,9 @@ function loop()
             platforms[3].visible=false;
             platforms[4].visible=false;
             platforms[5].visible=false;
+            platforms[6].visible=false;
+            platforms[7].visible=false;
+            platforms[8].visible=false;
             gameState=STANDBY;
             break;
         case GAME_OVER:
@@ -350,7 +442,10 @@ function loop()
             btnInstruct.visible=false;
             btnMenu.visible=true;
             btnContinue.visible=true;
+            textScore.x=50;
+            textScore.y=450;
             textScore.visible=true;
+            textTime.visible=false;
             door.visible=false;
             player.visible=false;
             doorHPBar.visible=false;
@@ -362,6 +457,9 @@ function loop()
             platforms[3].visible=false;
             platforms[4].visible=false;
             platforms[5].visible=false;
+            platforms[6].visible=false;
+            platforms[7].visible=false;
+            platforms[8].visible=false;
             doorHitSound.stop();
             if(gameOverSound==undefined)
                     gameOverSound=createjs.Sound.play("./Assets/GO.ogg");
@@ -385,11 +483,11 @@ function loop()
             gameState=STANDBY;
             break;
         case STANDBY:
-            textTime.text="Time: " + gameTimer;
+            textTime.text=Math.floor(gameTimer/60) + " : " + Math.round(gameTimer%60);
             textScore.text="Score: " + score;
             break;
         case PLAYING:
-            textTime.text="Time: " + gameTimer;
+            textTime.text=Math.floor(gameTimer/60) + " : " + Math.round(gameTimer%60);
             textScore.text="Score: " + score;
             break;
     }
@@ -401,17 +499,29 @@ function loop()
         handleFire();
         handleEnemies();
         HPBarScale();
+        PlayerHandle();
     }
     if(doorHP==0 || doorTwoHP==0)
             gameState=GAME_OVER;
+    
+    if(mute)
+    {
+        alreadyPlaying=false;
+        music.stop();
+    }
+    else if(!alreadyPlaying)
+    {
+        alreadyPlaying=true;
+        music.play({loop:-1});
+    }
 }
 createjs.Ticker.addEventListener("tick", loop);
 createjs.Ticker.setFPS(FPS);
 
 function HPBarScale()
 {
-    doorHPBar.scaleX=doorHP/10;
-    doorTwoHPBar.scaleX=doorTwoHP/10;
+    doorHPBar.scaleX=doorHP/50;
+    doorTwoHPBar.scaleX=doorTwoHP/50;
 }
 
 function playerReset()
@@ -433,13 +543,22 @@ createjs.Sound.registerPlugins([ createjs.HTMLAudioPlugin]);
 createjs.Sound.alternateExtensions = ["ogg"];
 
 manifest=[
-    {src:"title.jpg", id:"title"},
-    {src:"background.jpg", id:"background"},
-    {src:"INSTRUCTScreen.jpg",id:"instructions"},
-    {src:"GOScreen.jpg", id:"gameover"},
+    {src:"Title(SIP).jpg", id:"title"},
+    {src:"Background(SIP).png", id:"background"},
+    {src:"Instructions(SIP)V2.jpg",id:"instructions"},
+    {src:"GameOver(SIP)V2.jpg", id:"gameover"},
     {src:"levelsign.png", id:"levelsign"},
-    {src:"buttons.png", id:"button"},
-    {src:"sprites.png", id:"sprites"}
+    {src:"Buttons(SIP)V2.png", id:"button"},
+    {src:"sprites.png", id:"sprites"},
+    {src:"Bullet.png", id:"bullet"},
+    {src:"Platform(SIP).png", id:"platform"},
+    {src:"door.png", id:"door"},
+    {src:"HPBar.png", id:"HP"},
+    {src:"AlienWalkSheet.png", id:"AW"},
+    {src:"Badge.png", id:"Badge"},
+    {src:"SpaceManV2.png", id:"SpaceMan"},
+    {src:"SoundOff.png", id:"SoundOFF"},
+    {src:"SoundOn.png", id:"SoundON"}
 ];
 
 var queue;
@@ -476,15 +595,30 @@ function loadComplete(evt)
     });
     
     walkSheet = new createjs.SpriteSheet({
-        images: [queue.getResult("sprites")],
-        frames: [[160,0,19,49,0,10.05,48.6],[179,0,34,44,0,17.05,43.6],     [213,0,22,46,0,9.05,45.6],[235,0,17,49,0,8.05,48.6],[0,49,25,49,0,10.05,48.6],[25,49,31,46,0,14.05,45.6],[56,49,33,44,0,16.05,43.6],[89,49,30,44,0,17.05,43.6],[119,49,28,46,0,17.05,45.6],[147,49,19,49,0,10.05,48.6],[166,49,23,49,0,14.05,48.6],[189,49,31,46,0,16.05,45.6],[220,49,34,44,0,17.05,43.6],[0,98,19,49,0,9.05,48.6],[19,98,34,44,0,17.05,43.6],[53,98,22,46,0,13.05,45.6],[75,98,17,49,0,9.05,48.6],[92,98,25,49,0,15.05,48.6],[117,98,31,46,0,17.05,45.6],[148,98,33,44,0,17.05,43.6],[181,98,30,44,0,13.05,43.6],[211,98,28,46,0,11.05,45.6],[0,147,19,49,0,9.05,48.6],[19,147,23,49,0,9.05,48.6],[42,147,31,46,0,15.05,45.6],[73,147,34,44,0,17.05,43.6]],
+        images: [queue.getResult("AW")],
+        frames: [[0,0,71,83,0,35.4,52.9],[71,0,68,76,0,32.4,49.9],[139,0,62,79,0,28.4,50.9],[0,83,56,83,0,22.4,52.9],[56,83,56,83,0,22.4,52.9],[112,83,64,83,0,28.4,50.9],[176,83,63,81,0,29.4,49.9],[0,166,62,83,0,28.4,50.9],[62,166,53,88,0,21.4,54.9],[115,166,53,89,0,18.4,54.9]],
+        animations:{
+            walk:{
+                frames:[0,1,2,3,4,5,6,7,8,9],
+                speed:0.2
+            }
+    }});
+    
+    SpaceManSheet=new createjs.SpriteSheet({
+        images:[queue.getResult("SpaceMan")],
+        frames: [[0,0,50,51,0,-30.5,0],[50,0,50,49,0,-30.5,0],[0,51,52,51,0,-29.5,0],[52,51,50,51,0,-30.5,0],[0,102,48,49,0,-31.5,0],[48,102,50,49,0,-30.5,0],[0,151,48,50,0,-31.5,0],[48,151,50,49,0,-30.5,0],[0,201,52,49,0,-29.5,0],[52,201,52,49,0,-29.5,0]],
         animations: {
-            standRight: [0, 0, "standRight"],
-            walkRight: [1, 12, "walkRight", .5],
-            standLeft: [13, 13, "standLeft"],
-            walkLeft: [14, 25, "walkLeft", .5]
-            }     
-        });
+            walk:{
+                frames:[0,1,2,3,4,5,6,7],
+                speed:0.5
+            },
+            jump:{
+                frames:[8]
+            },
+            stand:{
+                frames:[9]   
+            }
+        }});
     
     titleScreen.scaleX=stage.canvas.width/titleScreen.image.width;
     titleScreen.scaleY=stage.canvas.height/titleScreen.image.height;
@@ -508,7 +642,7 @@ function tweenComplete(tween)
 }
 function tweenObj()
 {
-    myTween=createjs.Tween.get(levelSign, {loop:false}).wait(500).to({x:200, y:200, rotation:0},1500, createjs.Ease.bounceOut).wait(2000).to({y:1000, rotation:0}, 1000, createjs.Ease.backIn).call(tweenComplete);
+    myTween=createjs.Tween.get(levelSign, {loop:false}).wait(500).to({x:160, y:50, rotation:0},1500, createjs.Ease.bounceOut).wait(2000).to({y:1000, rotation:0}, 1000, createjs.Ease.backIn).call(tweenComplete);
 }
 
 function addForce(force)
@@ -520,8 +654,7 @@ function spawnEnemy()
 {
     enemyCount+=1;
     
-    var newEnemy=new createjs.Shape();
-    newEnemy.graphics.beginFill("#A66").drawRect(0,0,20,30);
+    var newEnemy=new createjs.Sprite(walkSheet, "walk");
     
     var x=spawnPositionsX[Math.round(Math.random()*1)];
     var y=spawnPositionsY[Math.round(Math.random()*2)];
@@ -530,16 +663,18 @@ function spawnEnemy()
     newEnemy.y=y;
     var dir=Math.random()*2;
     
-    enemies.push(newEnemy);
-    
     if(dir<1)
     {
         enemyDir.push(true);
+        newEnemy.scaleX=1;
     }
     else
     {
         enemyDir.push(false);   
+        newEnemy.scaleX=-1;
     }
+    
+     enemies.push(newEnemy);
     
     stage.addChild(enemies[enemyCount-1]);
 }
@@ -559,21 +694,24 @@ function handleEnemies()
         
         if(enemies[i].x<0)
         {
-            enemyDir[i]=!enemyDir[i];   
+            enemyDir[i]=!enemyDir[i]; 
+            enemies[i].scaleX=1;
         }
         else if(enemies[i].x+20>800)
         {
-            enemyDir[i]=!enemyDir[i];   
+            enemyDir[i]=!enemyDir[i]; 
+            enemies[i].scaleX=-1;
         }
         
         var step=1/((FPS)+300);
         enemies[i].y+=3000*step;
         
+        var extraY=5;
         for(j=0; j<6; j++)
         {
-            if((platforms[j].y<enemies[i].y+30 && platforms[j].y>enemies[i].y) && (platforms[j].x<enemies[i].x+playerWidth && platforms[j].x+platWidths[j]>enemies[i].x))
+            if((platforms[j].y+extraY<enemies[i].y+30 && platforms[j].y+extraY>enemies[i].y) && (platforms[j].x+20<enemies[i].x+playerWidth && platforms[j].x+platWidths[j]>enemies[i].x))
            {
-               enemies[i].y=platforms[j].y-30;
+               enemies[i].y=platforms[j].y+extraY-30;
            }
         }
         
@@ -603,7 +741,7 @@ function handleEnemies()
         
         for(j=0; j<shooterCount; j++)
         {
-            if(shooter[j].x+10<enemies[i].x+20 && shooter[j].x+10>enemies[i].x && shooter[j].y+10<enemies[i].y+30 && shooter[j].y+10>enemies[i].y)
+            if(shooter[j].x+10<enemies[i].x+20 && shooter[j].x+10>enemies[i].x && shooter[j].y+5<enemies[i].y+50 && shooter[j].y+5>enemies[i].y-50)
             {
                 stage.removeChild(enemies[i]);
                 enemies.splice(i,1);
@@ -623,10 +761,16 @@ function fire(direction)
 {
     shooterCount+=1;
     
-    var newFire=new createjs.Shape();
-    newFire.graphics.beginFill("#A66").drawCircle(0,0,10);
-    newFire.x=player.x+(playerWidth/2);
-    newFire.y=player.y+(playerHeight/2);
+    var newFire=new createjs.Bitmap(queue.getResult("bullet"));
+    newFire.x=player.x+(playerWidth+30);
+    newFire.y=player.y+(playerHeight/2-20);
+    
+    if(!direction)
+    {
+        newFire.rotation=180;
+        newFire.y+=25;
+    }
+    
     shooter.push(newFire);
     shooterDir.push(direction);
     
@@ -646,13 +790,70 @@ function handleFire()
             shooter[i].x-=10;   
         }
         
-        if(shooter[i].x<0 || shooter[i].x>800)
+        if(shooter[i].x<0-20 || shooter[i].x>800)
         {
             stage.removeChild(shooter[i]);
             shooter.splice(i,1);
             shooterDir.splice(i,1);
             shooterCount--;
         }
+    }
+}
+
+var alreadyWalking;
+function PlayerHandle()
+{
+    if(gameState==PLAYING)
+    {
+        if(LeftOn)
+        {
+            player.x-=20;
+            
+            if(!alreadyWalking)
+            {
+                player.gotoAndPlay("walk");
+                 alreadyWalking=true;
+            }
+            var tempX=player.x;
+            player.regX=120;
+            player.scaleX=-1;
+        }
+        else if(RightOn)
+        {
+            player.x+=20;
+            
+            if(!alreadyWalking)
+            {
+                player.gotoAndPlay("walk");
+                alreadyWalking=true;
+            }
+            player.regX=0;
+            player.scaleX=1;
+        }
+        else
+        {
+            player.gotoAndPlay("stand");
+            alreadyWalking=false;
+        }
+        if(UpOn)
+        {
+            addForce(-1000);
+            player.gotoAndPlay("jump");
+        }
+        if(AOn)
+        {
+             fire(false);
+            player.regX=120;
+            player.scaleX=-1;
+        }
+        if(DOn)
+        {
+            fire(true);
+            player.regX=0;
+            player.scaleX=1;
+        }
+        if(JOn)
+            Jamie();
     }
 }
 
@@ -666,22 +867,21 @@ function handleKeyDown(evt)
     {
         case KEYCODE_LEFT:
             if(gameState===PLAYING && movePlayerLeft)
-                player.x-=20;
+                LeftOn=true;
             inputTextCases.text="Input: Left";
             break;
         case KEYCODE_RIGHT:
             if(gameState===PLAYING && movePlayerRight)
-                player.x+=20;
+                RightOn=true;
             inputTextCases.text="Input: Right";
             break;
         case KEYCODE_UP:
             if(gameState===PLAYING && movePlayerUP)
-                addForce(-6000);
+                UpOn=true;
             inputTextCases.text="Input: Up";
             break;
         case KEYCODE_DOWN:
             if(gameState===PLAYING)
-                
             inputTextCases.text="Input: Down";
             break;
         case KEYCODE_W:
@@ -689,18 +889,20 @@ function handleKeyDown(evt)
             break;
         case KEYCODE_A:
             inputTextCases.text="Input: A";
-            fire(false);
+            if(!DOn)
+                AOn=true;
             break;
         case KEYCODE_S:
             inputTextCases.text="Input: S";
             break;
         case KEYCODE_D:
             inputTextCases.text="Input: D";
-            fire(true);
+            if(!AOn)
+                DOn=true;
             break;
         case KEYCODE_J:
             inputTextCases.text="Input: J";
-            Jamie();
+            JOn=true;
         case KEYCODE_SPACE:
             inputTextCases.text="Input: Space";
             break;
@@ -727,12 +929,24 @@ function handleKeyUp(evt)
     switch(evt.keyCode)
     {
         case KEYCODE_LEFT:
+            LeftOn=false;
             break;
         case KEYCODE_RIGHT:
+            RightOn=false;
             break;
         case KEYCODE_UP:
+            UpOn=false
             break;
         case KEYCODE_DOWN:
+            break;
+        case KEYCODE_A:
+            AOn=false;
+            break;
+        case KEYCODE_D:
+            DOn=false;
+            break;
+        case KEYCODE_J:
+            JOn=false;
             break;
     }
 }
@@ -745,9 +959,6 @@ function mouseInit()
         mouseX = Math.floor(evt.stageX);
         mouseY = Math.floor(evt.stageY);
     });
-    
-    mxText.text="X Position: " + mouseX;
-    myText.text="Y Position: " + mouseY;
 }
 
 function collisionHandle()
@@ -756,12 +967,15 @@ function collisionHandle()
     movePlayerLeft=true;
     movePlayerUP=true;
     movePlayerDOWN=true;
+    
+    var extraY=5;
+    var offsetX=100;
        
     //Ground
-       if((platforms[1].y<player.y+playerHeight))
+       if((platforms[1].y+extraY<player.y+playerHeight))
        {
             movePlayerDOWN=false; 
-           player.y=580-playerHeight;
+           player.y=580+extraY-playerHeight;
        }
        else if(movePlayerDOWN)
        {
@@ -770,7 +984,7 @@ function collisionHandle()
        
     
     //plat1
-    if((platforms[0].x+platWidths[0]>player.x) && (platforms[0].y>player.y+playerHeight && platforms[0].y+platHeights[0]<player.y+playerHeight))
+    if((platforms[0].x+platWidths[0]>player.x) && (platforms[0].y+extraY>player.y+playerHeight && platforms[0].y+platHeights[0]<player.y+playerHeight))
        {
             movePlayerRight=false;
        }
@@ -779,7 +993,7 @@ function collisionHandle()
             movePlayerRight=true;   
        }
        
-       if((platforms[0].x<player.x+playerWidth) && (platforms[0].y>player.y+playerHeight && platforms[0].y+platHeights[0]<player.y+playerHeight))
+       if((platforms[0].x<player.x+playerWidth) && (platforms[0].y+extraY>player.y+playerHeight && platforms[0].y+platHeights[0]<player.y+playerHeight))
        {
              movePlayerLeft=false;  
        }
@@ -788,10 +1002,10 @@ function collisionHandle()
            movePlayerLeft=true;
        }
        
-       if((platforms[0].y<player.y+playerHeight && platforms[0].y>player.y) && (platforms[0].x<player.x+playerWidth && platforms[0].x+platWidths[0]>player.x))
+       if((platforms[0].y+extraY<player.y+playerHeight && platforms[0].y+extraY>player.y) && (platforms[0].x<player.x+playerWidth && platforms[0].x+platWidths[0]>player.x))
        {
            movePlayerDOWN=false;
-           player.y=platforms[0].y-playerHeight;
+           player.y=platforms[0].y+extraY-playerHeight;
        }
        else if(movePlayerDOWN)
        {
@@ -799,7 +1013,7 @@ function collisionHandle()
        }
     
     //plat2
-    if((platforms[2].x+platWidths[2]>player.x) && (platforms[2].y>player.y+playerHeight && platforms[2].y+platHeights[2]<player.y+playerHeight))
+    if((platforms[2].x+platWidths[2]>player.x) && (platforms[2].y+extraY>player.y+playerHeight && platforms[2].y+platHeights[2]<player.y+playerHeight))
        {
             movePlayerRight=false;
        }
@@ -808,7 +1022,7 @@ function collisionHandle()
             movePlayerRight=true;   
        }
        
-       if((platforms[2].x<player.x+playerWidth) && (platforms[2].y>player.y+playerHeight && platforms[2].y+platHeights[2]<player.y+playerHeight))
+       if((platforms[2].x<player.x+playerWidth) && (platforms[2].y+extraY>player.y+playerHeight && platforms[2].y+platHeights[2]<player.y+playerHeight))
        {
              movePlayerLeft=false;  
        }
@@ -817,10 +1031,10 @@ function collisionHandle()
            movePlayerLeft=true;
        }
        
-       if((platforms[2].y<player.y+playerHeight && platforms[2].y>player.y) && (platforms[2].x<player.x+playerWidth && platforms[2].x+platWidths[2]>player.x))
+       if((platforms[2].y+extraY<player.y+playerHeight && platforms[2].y+extraY>player.y) && (platforms[2].x<player.x+playerWidth && platforms[2].x+platWidths[2]>player.x))
        {
            movePlayerDOWN=false;
-           player.y=platforms[2].y-playerHeight;
+           player.y=platforms[2].y+extraY-playerHeight;
        }
        else if(movePlayerDOWN)
        {
@@ -828,7 +1042,7 @@ function collisionHandle()
        }
     
     //plat1
-    if((platforms[3].x+platWidths[3]>player.x) && (platforms[3].y>player.y+playerHeight && platforms[3].y+platHeights[3]<player.y+playerHeight))
+    if((platforms[3].x+platWidths[3]>player.x) && (platforms[3].y+extraY>player.y+playerHeight && platforms[3].y+platHeights[3]<player.y+playerHeight))
        {
             movePlayerRight=false;
        }
@@ -837,7 +1051,7 @@ function collisionHandle()
             movePlayerRight=true;   
        }
        
-       if((platforms[3].x<player.x+playerWidth) && (platforms[3].y>player.y+playerHeight && platforms[3].y+platHeights[3]<player.y+playerHeight))
+       if((platforms[3].x<player.x+playerWidth) && (platforms[3].y+extraY>player.y+playerHeight && platforms[3].y+platHeights[3]<player.y+playerHeight))
        {
              movePlayerLeft=false;  
        }
@@ -846,10 +1060,10 @@ function collisionHandle()
            movePlayerLeft=true;
        }
        
-       if((platforms[3].y<player.y+playerHeight && platforms[3].y>player.y) && (platforms[3].x<player.x+playerWidth && platforms[3].x+platWidths[3]>player.x))
+       if((platforms[3].y+extraY<player.y+playerHeight && platforms[3].y+extraY>player.y) && (platforms[3].x<player.x+playerWidth && platforms[3].x+platWidths[3]>player.x))
        {
            movePlayerDOWN=false;
-           player.y=platforms[3].y-playerHeight;
+           player.y=platforms[3].y+extraY-playerHeight;
        }
        else if(movePlayerDOWN)
        {
@@ -857,7 +1071,7 @@ function collisionHandle()
        }
     
     //plat1
-    if((platforms[4].x+platWidths[4]>player.x) && (platforms[4].y>player.y+playerHeight && platforms[4].y+platHeights[4]<player.y+playerHeight))
+    if((platforms[4].x+platWidths[4]>player.x) && (platforms[4].y+extraY>player.y+playerHeight && platforms[4].y+platHeights[4]<player.y+playerHeight))
        {
             movePlayerRight=false;
        }
@@ -866,7 +1080,7 @@ function collisionHandle()
             movePlayerRight=true;   
        }
        
-       if((platforms[4].x<player.x+playerWidth) && (platforms[4].y>player.y+playerHeight && platforms[4].y+platHeights[4]<player.y+playerHeight))
+       if((platforms[4].x<player.x+playerWidth) && (platforms[4].y+extraY>player.y+playerHeight && platforms[4].y+platHeights[4]<player.y+playerHeight))
        {
              movePlayerLeft=false;  
        }
@@ -875,10 +1089,10 @@ function collisionHandle()
            movePlayerLeft=true;
        }
        
-       if((platforms[4].y<player.y+playerHeight && platforms[4].y>player.y) && (platforms[4].x<player.x+playerWidth && platforms[4].x+platWidths[4]>player.x))
+       if((platforms[4].y+extraY<player.y+playerHeight && platforms[4].y+extraY>player.y) && (platforms[4].x<player.x+playerWidth && platforms[4].x+platWidths[4]>player.x))
        {
            movePlayerDOWN=false;
-           player.y=platforms[4].y-playerHeight;
+           player.y=platforms[4].y+extraY-playerHeight;
        }
        else if(movePlayerDOWN)
        {
@@ -895,7 +1109,7 @@ function collisionHandle()
             movePlayerRight=true;   
        }
        
-       if((platforms[5].x<player.x+playerWidth) && (platforms[5].y>player.y+playerHeight && platforms[5].y+platHeights[5]<player.y+playerHeight))
+       if((platforms[5].x<player.x+playerWidth) && (platforms[5].y+extraY>player.y+playerHeight && platforms[5].y+platHeights[5]<player.y+playerHeight))
        {
              movePlayerLeft=false;  
        }
@@ -904,23 +1118,23 @@ function collisionHandle()
            movePlayerLeft=true;
        }
        
-       if((platforms[5].y<player.y+playerHeight && platforms[5].y>player.y) && (platforms[5].x<player.x+playerWidth && platforms[5].x+platWidths[5]>player.x))
+       if((platforms[5].y+extraY<player.y+playerHeight && platforms[5].y+extraY>player.y) && (platforms[5].x<player.x+playerWidth && platforms[5].x+platWidths[5]>player.x))
        {
            movePlayerDOWN=false;
-           player.y=platforms[5].y-playerHeight;
+           player.y=platforms[5].y+extraY-playerHeight;
        }
        else if(movePlayerDOWN)
        {
             movePlayerDOWN=true;   
        }
     
-    if(player.x<0)
+    if(player.x<-10)
     {
-        player.x=0;   
+        player.x=-20;   
     }
-    if(player.x+playerWidth>800)
+    if(player.x+playerWidth>740)
     {
-        player.x=800-playerWidth;
+        player.x=740-playerWidth;
     }
     if(player.y+playerHeight<0)
     {
@@ -963,8 +1177,6 @@ function runGameTimer()
         {
             spawnSpeed+=spawnerCount+1;
         }
-        console.log("Spawn "+spawnSpeed);
-        console.log("Frame "+frameCount);
     }
     
     var step=1/((FPS)+300);
